@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endee AI | Multi-Source RAG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; min-height: 100vh; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; }
+        .input-style { background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); transition: 0.3s; }
+        .input-style:focus { border-color: #818cf8; outline: none; }
+        .btn-primary { background: #6366f1; transition: 0.2s; }
+        .btn-primary:hover { background: #4f46e5; transform: scale(1.02); }
+    </style>
+</head>
+<body class="p-6 flex flex-col items-center">
+
+    <header class="text-center my-10 animate__animated animate__fadeIn">
+        <h1 class="text-4xl font-bold text-white">Endee AI Pro</h1>
+        <p class="text-slate-400">Multi-source Knowledge Retrieval & Synthesis</p>
+    </header>
+
+    <div class="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="glass p-8 animate__animated animate__fadeInLeft">
+            <h2 class="text-lg font-semibold mb-4">📂 Knowledge Intake</h2>
+            <input type="text" id="docId" placeholder="Prefix (e.g., wiki)" class="w-full p-3 rounded-lg input-style mb-4">
+            <textarea id="docText" placeholder="Paste text here. New lines create new chunks..." rows="5" class="w-full p-3 rounded-lg input-style mb-4"></textarea>
+            <button onclick="addDoc()" class="w-full btn-primary p-3 rounded-lg font-bold">Index Knowledge</button>
+            <div id="status" class="mt-2 text-center text-sm font-bold"></div>
+        </div>
+
+        <div class="glass p-8 animate__animated animate__fadeInRight">
+            <h2 class="text-lg font-semibold mb-4">🔍 AI Query</h2>
+            <input type="text" id="query" placeholder="Ask about your data..." class="w-full p-3 rounded-lg input-style mb-4">
+            <button onclick="search()" class="w-full btn-primary p-3 rounded-lg font-bold">Generate Answer</button>
+            <button onclick="clearDB()" class="w-full mt-4 text-red-400 text-xs hover:underline block mx-auto">Wipe DB History</button>
+        </div>
+    </div>
+
+    <div id="resultBox" class="max-w-6xl w-full mt-8 glass p-8 hidden animate__animated animate__fadeInUp">
+        <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">AI Synthesized Answer</h3>
+        <p id="answer" class="text-lg text-slate-100 leading-relaxed mb-6"></p>
+        
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Retrieved Sources</h3>
+        <div id="sources" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    </div>
+
+    <script>
+        async function addDoc() {
+            const id = document.getElementById('docId').value;
+            const text = document.getElementById('docText').value;
+            const status = document.getElementById('status');
+            if(!id || !text) return;
+            status.innerText = "Processing...";
+            const res = await fetch('/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, text}) });
+            const data = await res.json();
+            status.innerText = data.message;
+            status.className = "mt-2 text-center text-sm font-bold text-green-400";
+        }
+
+        async function search() {
+            const query = document.getElementById('query').value;
+            if(!query) return;
+            document.getElementById('resultBox').classList.remove('hidden');
+            document.getElementById('answer').innerText = "Generating from multiple sources...";
+            document.getElementById('sources').innerHTML = "";
+
+            const res = await fetch('/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text: query}) });
+            const data = await res.json();
+            document.getElementById('answer').innerText = data.answer;
+            data.results.forEach(r => {
+                document.getElementById('sources').innerHTML += `
+                    <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
+                        <div class="flex justify-between text-[10px] text-slate-500 mb-1">
+                            <span>ID: ${r.id}</span>
+                            <span>Score: ${r.score.toFixed(3)}</span>
+                        </div>
+                        <p class="text-xs italic text-slate-400 truncate">${r.text}</p>
+                    </div>
+                `;
+            });
+        }
+
+        async function clearDB() {
+            if(confirm("Wipe all?")) { await fetch('/clear', {method: 'POST'}); location.reload(); }
+        }
+    </script>
+</body>
+</html>
